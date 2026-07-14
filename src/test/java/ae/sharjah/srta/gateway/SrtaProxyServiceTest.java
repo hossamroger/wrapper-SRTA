@@ -25,8 +25,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
- * Verifies the OSB flow (validate -> static Bearer -> SRTA backend) end to end
- * against a stubbed HTTP layer, without booting a Spring context.
+ * Verifies the OSB flow (validate -> static Bearer -> native SRTA backend) end to
+ * end against a stubbed HTTP layer. The gateway is a transparent facade: inbound
+ * paths are the native operation names, forwarded 1:1.
  */
 class SrtaProxyServiceTest {
 
@@ -54,8 +55,6 @@ class SrtaProxyServiceTest {
         props.setBackendBaseUrl(BACKEND_BASE);
         props.getBackend().setBearerToken(JWT);
         props.getValidation().setUrl(VALIDATE_URL);
-        props.getPathOverrides().put("/deg/lookup", "/Lockup");
-        props.getPathOverrides().put("/deg/taxi-complaint-details", "/TaxiComplaintDetails");
 
         UserValidationService validation = new UserValidationService(restTemplate, props);
         service = new SrtaProxyService(restTemplate, props, validation);
@@ -69,18 +68,19 @@ class SrtaProxyServiceTest {
     }
 
     @Test
-    void lookup_validatesThenPostsToSrtaWithStaticBearer_andRenamedPath() {
+    void lookup_validatesThenPostsToNativeLockupWithStaticBearer() {
         server.expect(requestTo(VALIDATE_URL)).andExpect(method(HttpMethod.POST))
                 .andExpect(header("dstoken", "USER-TOKEN"))
                 .andExpect(header("dscode", "RT-001"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
+        // Inbound path is the native name; forwarded 1:1.
         server.expect(requestTo(BACKEND_BASE + "/Lockup")).andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer " + JWT))
                 .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
         ResponseEntity<byte[]> response =
-                service.forward("/deg/lookup", HttpMethod.POST, null, inbound(), "{}".getBytes());
+                service.forward("/Lockup", HttpMethod.POST, null, inbound(), "{}".getBytes());
 
         server.verify();
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -93,23 +93,22 @@ class SrtaProxyServiceTest {
                 .andRespond(withSuccess("{\"statusCode\":\"401\"}", MediaType.APPLICATION_JSON));
 
         assertThrows(UnauthorizedException.class, () ->
-                service.forward("/deg/lookup", HttpMethod.POST, null, inbound(), "{}".getBytes()));
+                service.forward("/Lockup", HttpMethod.POST, null, inbound(), "{}".getBytes()));
 
         server.verify();
     }
 
     @Test
-    void nonLookupPath_skipsValidationWhenScopedToLookupOnly() {
-        // OSB parity: validate only /deg/lookup
-        props.getValidation().setPaths(Arrays.asList("/deg/lookup"));
+    void complaintPath_forwardsNativeNameUnchanged() {
+        // Scope validation to Lockup only (OSB parity) -> this path skips validation.
+        props.getValidation().setPaths(Arrays.asList("/Lockup"));
 
-        // No validate call expected; straight to backend with the Bearer.
         server.expect(requestTo(BACKEND_BASE + "/TaxiComplaintDetails")).andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer " + JWT))
                 .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
         ResponseEntity<byte[]> response =
-                service.forward("/deg/taxi-complaint-details", HttpMethod.POST, null, inbound(), "{}".getBytes());
+                service.forward("/TaxiComplaintDetails", HttpMethod.POST, null, inbound(), "{}".getBytes());
 
         server.verify();
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -122,7 +121,7 @@ class SrtaProxyServiceTest {
                 .andRespond(withStatus(HttpStatus.BAD_GATEWAY).body("upstream down"));
 
         ResponseEntity<byte[]> response =
-                service.forward("/deg/lookup", HttpMethod.POST, null, inbound(), "{}".getBytes());
+                service.forward("/Lockup", HttpMethod.POST, null, inbound(), "{}".getBytes());
 
         server.verify();
         assertEquals(HttpStatus.BAD_GATEWAY, response.getStatusCode());
