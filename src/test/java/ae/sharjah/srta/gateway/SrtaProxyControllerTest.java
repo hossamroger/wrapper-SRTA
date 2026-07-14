@@ -18,8 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the dynamic controller maps every SRTA /deg/** URL and extracts the
- * correct sub-path, using a recording stub instead of Mockito.
+ * Verifies the controller maps every native SRTA path and extracts the correct
+ * sub-path, using a recording stub instead of Mockito.
  */
 class SrtaProxyControllerTest {
 
@@ -42,32 +42,32 @@ class SrtaProxyControllerTest {
     }
 
     @Test
-    void mapsLookup() throws Exception {
-        mockMvc.perform(post("/deg/lookup").content("{}".getBytes()))
+    void mapsLockup() throws Exception {
+        mockMvc.perform(post("/Lockup").content("{}".getBytes()))
                 .andExpect(status().isOk())
-                .andExpect(content().string("handled:/deg/lookup"));
-        assertEquals("/deg/lookup", capturedSubPath.get());
+                .andExpect(content().string("handled:/Lockup"));
+        assertEquals("/Lockup", capturedSubPath.get());
         assertEquals(HttpMethod.POST, capturedMethod.get());
     }
 
     @Test
     void mapsTaxiComplaintDetails() throws Exception {
-        mockMvc.perform(post("/deg/taxi-complaint-details").content("{}".getBytes()))
+        mockMvc.perform(post("/TaxiComplaintDetails").content("{}".getBytes()))
                 .andExpect(status().isOk());
-        assertEquals("/deg/taxi-complaint-details", capturedSubPath.get());
+        assertEquals("/TaxiComplaintDetails", capturedSubPath.get());
     }
 
     @Test
     void mapsLostComplaintDetails() throws Exception {
-        mockMvc.perform(post("/deg/lost-complaint-details").content("{}".getBytes()))
+        mockMvc.perform(post("/LostComplaintDetails").content("{}".getBytes()))
                 .andExpect(status().isOk());
-        assertEquals("/deg/lost-complaint-details", capturedSubPath.get());
+        assertEquals("/LostComplaintDetails", capturedSubPath.get());
     }
 
     @Test
     void mapsRoadComplaintDetails() throws Exception {
-        mockMvc.perform(post("/deg/road-complaint-details").content("{}".getBytes()))
+        mockMvc.perform(post("/RoadComplaintDetails").content("{}".getBytes()))
                 .andExpect(status().isOk());
-        assertEquals("/deg/road-complaint-details", capturedSubPath.get());
+        assertEquals("/RoadComplaintDetails", capturedSubPath.get());
     }
 }

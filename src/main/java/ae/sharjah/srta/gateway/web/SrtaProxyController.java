@@ -14,10 +14,11 @@ import org.springframework.web.servlet.HandlerMapping;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * The single dynamic controller that handles every SRTA {@code /deg/*} endpoint
- * routing to the DeG/V1 backend. Instead of one handler per operation (the OSB
- * pipeline had 4 route-nodes), the inbound path is captured at runtime and
- * forwarded generically through {@link SrtaProxyService}.
+ * The single controller that handles every SRTA endpoint. The gateway is a
+ * transparent facade over the native SRTA DeG/V1 backend: the inbound paths are
+ * the <em>native</em> operation names, forwarded 1:1 (the gateway only adds user
+ * validation and the static Bearer). The inbound path is captured at runtime and
+ * forwarded through {@link SrtaProxyService}.
  */
 @RestController
 public class SrtaProxyController {
@@ -28,7 +29,7 @@ public class SrtaProxyController {
         this.proxyService = proxyService;
     }
 
-    @RequestMapping("/deg/**")
+    @RequestMapping({"/Lockup", "/LostComplaintDetails", "/TaxiComplaintDetails", "/RoadComplaintDetails"})
     public ResponseEntity<byte[]> proxy(HttpServletRequest request,
                                         @RequestHeader HttpHeaders headers,
                                         @RequestBody(required = false) byte[] body) {
@@ -42,7 +43,7 @@ public class SrtaProxyController {
 
     /**
      * Returns the path within the handler mapping (relative to the servlet
-     * context), always starting with '/', e.g. {@code /deg/lookup}.
+     * context), always starting with '/', e.g. {@code /Lockup}.
      */
     private String extractSubPath(HttpServletRequest request) {
         String path = (String) request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
