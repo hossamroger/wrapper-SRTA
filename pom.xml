@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.2.8.RELEASE</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>ae.sharjah.srta</groupId>
+    <artifactId>srta-gateway</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+    <name>SRTA Gateway</name>
+    <description>Dynamic Spring Boot gateway mirroring the OSB ShjRoadsTransportDeptServices flow (validate -> static Bearer -> SRTA DeG/V1 backend)</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Health / readiness for standalone deployment monitoring -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Container is provided by the target app server (WebLogic/Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>srta-gateway</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!--
+                Web resources (WEB-INF/weblogic.xml, web.xml) live in ./webapp
+                rather than the Maven default src/main/webapp. Point the WAR plugin
+                at them so weblogic.xml - which isolates the app's Spring classes
+                from the WebLogic-provided ones via prefer-application-packages -
+                is packaged into the WAR.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <configuration>
+                    <warSourceDirectory>${project.basedir}/webapp</warSourceDirectory>
+                </configuration>
+            </plugin>
+
+            <!--
+                Surefire pinned to a JDK 21 capable version so the test suite can
+                execute in this build environment. No effect on the produced
+                artifact, which is compiled to Java 8 bytecode.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
