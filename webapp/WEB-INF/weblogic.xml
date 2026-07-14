@@ -2,7 +2,7 @@
 <weblogic-web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="http://xmlns.oracle.com/weblogic/weblogic-web-app http://xmlns.oracle.com/weblogic/weblogic-web-app/1.7/weblogic-web-app.xsd"
                   xmlns="http://xmlns.oracle.com/weblogic/weblogic-web-app">
-    <context-root>/online/shjroadsransportdeptservices</context-root>
+    <context-root>/wrapper-srta/api</context-root>
     <container-descriptor>
         <prefer-application-packages>
             <package-name>org.slf4j.*</package-name>
