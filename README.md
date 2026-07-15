@@ -2,8 +2,9 @@
 
 A standalone Spring Boot gateway that mirrors the Oracle Service Bus (OSB)
 `ShjRoadsTransportSocialDeptServicesPipeline` flow — the APIs that route to the
-SRTA backend **`https://eformstaging.srta.gov.ae/DeG/V1`**. A single dynamic
-controller exposes the 4 native SRTA operations directly (transparent facade).
+SRTA backends. It is a transparent facade over two native APIs:
+**`https://eformstaging.srta.gov.ae/DeG/V1`** (complaints/lookup) and
+**`https://ebooking.srta.gov.ae:9101/taxidispatch`** (ebooking/taxidispatch).
 
 - **Java:** 8
 - **Spring Boot:** 2.2.8.RELEASE
@@ -45,12 +46,30 @@ operation names, forwarded 1:1 (no renaming).
 | `/LostComplaintDetails` | `/LostComplaintDetails` |
 | `/RoadComplaintDetails` | `/RoadComplaintDetails` |
 
+### taxidispatch / ebooking (auth: static `accessToken` header)
+
+| Inbound | Native backend (`…:9101/taxidispatch`) | Method |
+|---|---|---|
+| `/vehicleType` | `/vehicleType` | POST |
+| `/vehiclelocation` | `/vehiclelocation` | POST |
+| `/cancel` | `/cancel` | POST |
+| `/getFare` | `/getFare` | POST |
+| `/nearbyvehicles` | `/nearbyvehicles` | POST |
+| `/jobstatus` | `/jobstatus` | POST |
+| `/jobdetails` | `/jobdetails` | POST |
+| `/book` | `/book` | POST |
+| `/driverPhoto` | `/driverPhoto` | GET |
+| `/searchAddrByLatLon` | `/searchAddrByLatLon` | GET |
+| `/searchAddrByKeyword` | `/searchAddrByKeyword` | GET |
+
 ## Configuration (`application.properties` + profiles)
 
 | Property | Meaning |
 |---|---|
 | `srta.backend-base-url` | SRTA base URL (`https://eformstaging.srta.gov.ae/DeG/V1`) |
-| `srta.backend.bearer-token` | Static Bearer JWT. **Supply via `SRTA_BACKEND_BEARER` — do not commit.** |
+| `srta.backend.bearer-token` | Static Bearer JWT for DeG/V1. **Supply via `SRTA_BACKEND_BEARER` — do not commit.** |
+| `srta.ebooking.base-url` | taxidispatch base URL (`https://ebooking.srta.gov.ae:9101/taxidispatch`) |
+| `srta.ebooking.access-token` | Static `accessToken` for taxidispatch. **Supply via `SRTA_EBOOKING_TOKEN` — do not commit.** |
 | `srta.validation.enabled` / `.url` / `.dscode` | User validation (dscode `RT-001`) |
 | `srta.validation.paths` | Which inbound paths to validate. Empty = all; set `/Lockup` for exact OSB parity |
 Profiles: `local`, `stg`, `prod`. Default is `stg`; override with

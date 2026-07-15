@@ -21,6 +21,7 @@ public class SrtaProperties {
     private String backendBaseUrl;
 
     private final Backend backend = new Backend();
+    private final Ebooking ebooking = new Ebooking();
     private final Validation validation = new Validation();
 
     /**
@@ -39,6 +40,21 @@ public class SrtaProperties {
 
         public String getBearerToken() { return bearerToken; }
         public void setBearerToken(String bearerToken) { this.bearerToken = bearerToken; }
+    }
+
+    public static class Ebooking {
+        /** Base URL of the taxidispatch backend, e.g. https://ebooking.srta.gov.ae:9101/taxidispatch */
+        private String baseUrl;
+        /**
+         * Static token OSB sent to taxidispatch as the {@code accessToken} header.
+         * Supply via env var (SRTA_EBOOKING_TOKEN); do NOT commit the real value.
+         */
+        private String accessToken;
+
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getAccessToken() { return accessToken; }
+        public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
     }
 
     public static class Validation {
@@ -96,6 +112,7 @@ public class SrtaProperties {
     public String getBackendBaseUrl() { return backendBaseUrl; }
     public void setBackendBaseUrl(String backendBaseUrl) { this.backendBaseUrl = backendBaseUrl; }
     public Backend getBackend() { return backend; }
+    public Ebooking getEbooking() { return ebooking; }
     public Validation getValidation() { return validation; }
     public Map<String, String> getPathOverrides() { return pathOverrides; }
     public void setPathOverrides(Map<String, String> pathOverrides) { this.pathOverrides = pathOverrides; }

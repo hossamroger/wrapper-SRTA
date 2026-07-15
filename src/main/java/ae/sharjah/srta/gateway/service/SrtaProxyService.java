@@ -13,19 +13,21 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.function.Consumer;
+
 /**
- * Orchestrates the OSB {@code ShjRoadsTransportDeptServices} flow for every
- * {@code /deg/*} sub-path that routes to the SRTA DeG/V1 backend:
+ * Orchestrates the OSB {@code ShjRoadsTransport} flows. The gateway is a
+ * transparent facade over two native SRTA backends:
  *
- * <ol>
- *   <li>validate the caller (401 short-circuit) with dscode RT-001
- *       (OSB validated only /deg/lookup; configurable via srta.validation.paths)</li>
- *   <li>inject the static Bearer token as the {@code authorization} header</li>
- *   <li>POST to the SRTA backend at the renamed path and return its response</li>
- * </ol>
+ * <ul>
+ *   <li><b>DeG/V1</b> (complaints/lookup) — authenticated with a static Bearer JWT
+ *       ({@link #forward}).</li>
+ *   <li><b>taxidispatch / ebooking</b> — authenticated with a static
+ *       {@code accessToken} header ({@link #forwardEbooking}).</li>
+ * </ul>
  *
- * <p>There is no token service and no DB lookup: the OSB business service
- * authenticated to SRTA with a hard-coded Bearer JWT, injected here.
+ * Both first validate the caller (dscode RT-001, 401 short-circuit), then forward
+ * the request 1:1 to the native backend.
  */
 @Service
 public class SrtaProxyService {
@@ -35,7 +37,7 @@ public class SrtaProxyService {
     /** Headers not forwarded from the inbound request (we set our own). */
     private static final String[] HOP_BY_HOP = {
             HttpHeaders.HOST, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONNECTION,
-            HttpHeaders.TRANSFER_ENCODING, HttpHeaders.AUTHORIZATION, "authorization"
+            HttpHeaders.TRANSFER_ENCODING, HttpHeaders.AUTHORIZATION, "authorization", "accesstoken"
     };
 
     private final RestTemplate restTemplate;
@@ -50,15 +52,23 @@ public class SrtaProxyService {
         this.validationService = validationService;
     }
 
-    /**
-     * @param subPath     the inbound path after the context (e.g. {@code /deg/lookup})
-     * @param method      the inbound HTTP method
-     * @param queryString the raw inbound query string (may be null)
-     * @param headers     the inbound headers
-     * @param body        the inbound body (may be null)
-     */
+    /** DeG/V1 backend — static Bearer JWT auth. */
     public ResponseEntity<byte[]> forward(String subPath, HttpMethod method, String queryString,
                                           HttpHeaders headers, byte[] body) {
+        return forwardTo(subPath, method, queryString, headers, body,
+                props.getBackendBaseUrl(), this::applyBearer);
+    }
+
+    /** taxidispatch / ebooking backend — static {@code accessToken} header auth. */
+    public ResponseEntity<byte[]> forwardEbooking(String subPath, HttpMethod method, String queryString,
+                                                  HttpHeaders headers, byte[] body) {
+        return forwardTo(subPath, method, queryString, headers, body,
+                props.getEbooking().getBaseUrl(), this::applyAccessToken);
+    }
+
+    private ResponseEntity<byte[]> forwardTo(String subPath, HttpMethod method, String queryString,
+                                             HttpHeaders headers, byte[] body,
+                                             String baseUrl, Consumer<HttpHeaders> authApplier) {
 
         // Step 1: validate user (dscode RT-001) where required
         if (props.requiresValidation(subPath)) {
@@ -68,18 +78,17 @@ public class SrtaProxyService {
             }
         }
 
-        // Resolve the backend sub-path (PascalCase operation name)
-        String backendPath = props.resolveBackendPath(subPath);
+        // Transparent facade: inbound path is the native path, forwarded 1:1.
         UriComponentsBuilder uriBuilder = UriComponentsBuilder
-                .fromHttpUrl(props.getBackendBaseUrl())
-                .path(backendPath);
+                .fromHttpUrl(baseUrl)
+                .path(props.resolveBackendPath(subPath));
         if (StringUtils.hasText(queryString)) {
             uriBuilder.query(queryString);
         }
         String backendUrl = uriBuilder.build(true).toUriString();
 
-        // Steps 2 & 3: inject the static Bearer and call SRTA
-        HttpHeaders outHeaders = buildBackendHeaders(headers);
+        // Steps 2 & 3: inject backend auth and call the native backend
+        HttpHeaders outHeaders = buildBackendHeaders(headers, authApplier);
         HttpEntity<byte[]> entity = new HttpEntity<>(body, outHeaders);
 
         log.debug("Forwarding {} {} -> {}", method, subPath, backendUrl);
@@ -89,19 +98,30 @@ public class SrtaProxyService {
         return copyResponse(backendResponse);
     }
 
-    private HttpHeaders buildBackendHeaders(HttpHeaders inbound) {
+    /** DeG auth: static Bearer JWT (OSB hard-coded this). */
+    private void applyBearer(HttpHeaders out) {
+        String token = props.getBackend().getBearerToken();
+        if (StringUtils.hasText(token)) {
+            out.set(HttpHeaders.AUTHORIZATION, token.startsWith("Bearer ") ? token : "Bearer " + token);
+        }
+    }
+
+    /** taxidispatch auth: static accessToken header (OSB hard-coded this). */
+    private void applyAccessToken(HttpHeaders out) {
+        String token = props.getEbooking().getAccessToken();
+        if (StringUtils.hasText(token)) {
+            out.set("accessToken", token);
+        }
+    }
+
+    private HttpHeaders buildBackendHeaders(HttpHeaders inbound, Consumer<HttpHeaders> authApplier) {
         HttpHeaders out = new HttpHeaders();
         inbound.forEach((name, values) -> {
             if (!isHopByHop(name)) {
                 out.put(name, values);
             }
         });
-        // SRTA auth: static Bearer JWT (OSB hard-coded this).
-        String token = props.getBackend().getBearerToken();
-        if (StringUtils.hasText(token)) {
-            String value = token.startsWith("Bearer ") ? token : "Bearer " + token;
-            out.set(HttpHeaders.AUTHORIZATION, value);
-        }
+        authApplier.accept(out);
         return out;
     }
 
