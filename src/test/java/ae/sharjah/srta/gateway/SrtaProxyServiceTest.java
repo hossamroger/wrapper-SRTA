@@ -34,6 +34,8 @@ class SrtaProxyServiceTest {
     private static final String VALIDATE_URL = "http://validate.local/validate";
     private static final String BACKEND_BASE = "http://srta.local/DeG/V1";
     private static final String JWT = "eyJtest.jwt.token";
+    private static final String EBOOKING_BASE = "http://ebooking.local/taxidispatch";
+    private static final String ACCESS_TOKEN = "89715e86-test-token";
 
     private RestTemplate restTemplate;
     private MockRestServiceServer server;
@@ -54,6 +56,8 @@ class SrtaProxyServiceTest {
         props = new SrtaProperties();
         props.setBackendBaseUrl(BACKEND_BASE);
         props.getBackend().setBearerToken(JWT);
+        props.getEbooking().setBaseUrl(EBOOKING_BASE);
+        props.getEbooking().setAccessToken(ACCESS_TOKEN);
         props.getValidation().setUrl(VALIDATE_URL);
 
         UserValidationService validation = new UserValidationService(restTemplate, props);
@@ -112,6 +116,25 @@ class SrtaProxyServiceTest {
 
         server.verify();
         assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void ebooking_validatesThenPostsToTaxidispatchWithAccessTokenHeader() {
+        server.expect(requestTo(VALIDATE_URL)).andExpect(method(HttpMethod.POST))
+                .andExpect(header("dscode", "RT-001"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        // Native taxidispatch path forwarded 1:1; auth is the accessToken header (not Bearer).
+        server.expect(requestTo(EBOOKING_BASE + "/book")).andExpect(method(HttpMethod.POST))
+                .andExpect(header("accessToken", ACCESS_TOKEN))
+                .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+        ResponseEntity<byte[]> response =
+                service.forwardEbooking("/book", HttpMethod.POST, null, inbound(), "{}".getBytes());
+
+        server.verify();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("*", response.getHeaders().getFirst("Access-Control-Allow-Origin"));
     }
 
     @Test
